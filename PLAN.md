@@ -9,3 +9,26 @@
 * [TODO] Print more stats for each roll
 * [TODO] Handle more complex dice patterns
 * [TODO] Add proper GUI -- maybe `raylib`?
+
+
+# Turn
+
+1. Game Starts Menu 
+    a) Play game #2
+    b) Exit 
+2. When Play starts:
+    a) PlayerTurn:
+        + Roll dices
+        + Draw Dices
+        + Draw Roll button
+    b) PlayerReroll:
+        + Reroll dices
+        + Draw Dices
+    c) PlayerWon
+
+    d) ComputerTurn
+
+    e) 
+
+
+

@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const is_gui_enabled: bool = true;
+
 pub fn build(b: *std.build.Builder) void {
     // Standard target options allows the person running `zig build` to choose
     // what target to build for. Here we do not override the defaults, which
@@ -12,6 +14,13 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
 
     const exe = b.addExecutable("diceroll", "src/main.zig");
+
+    if (is_gui_enabled and exe.target.isWindows()) {
+        try exe.addVcpkgPaths(.dynamic) catch @panic("vcpkg not found");
+        exe.linkSystemLibrary("raylib");
+        exe.linkSystemLibrary("c");
+    }
+
     exe.setTarget(target);
     exe.setBuildMode(mode);
     exe.install();
