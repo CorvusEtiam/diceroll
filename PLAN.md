@@ -8,8 +8,9 @@
 * [WIP] Add computer simulated players
 * [TODO] Print more stats for each roll
 * [TODO] Handle more complex dice patterns
-* [TODO] Add proper GUI -- maybe `raylib`?
-
+* [WIP] Add proper GUI -- maybe `raylib`?
+    * Render Dices
+    * On mouse click: reroll dice
 
 # Turn
 
@@ -30,5 +31,17 @@
 
     e) 
 
+# Gui Engine
+
+* Label
+* Button
+* HBox
+* VBox
+
+## GuiRect
+
++ cut(side: Side, size: u32);
++ pad(size: Side)
++ border(size: u32)
 
 

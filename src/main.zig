@@ -2,6 +2,7 @@ const std = @import("std");
 const prompt = @import("./prompt.zig");
 const c = @import("./c.zig");
 const ray = c.ray;
+const dice = @import("./dice.zig");
 
 pub const GameScreen = enum {
     StartMenu,
@@ -78,6 +79,9 @@ pub const State = struct {
     current_game_screen: GameScreen = .StartMenu,
     players: []Player = undefined,
     current_player: usize = 0,
+    dices: [5]u8 = .{0} ** 5,
+    reroll_buffer: [5]bool = [_]bool{true} ** 5,
+    reroll_count: usize = 0,
 
     pub fn getCurrentPlayer(self: *State) *Player {
         return &self.players[self.current_player];
@@ -107,10 +111,20 @@ pub const State = struct {
     }
 
     pub fn deinit(self: *State, alloc: *std.mem.Allocator) void {
-        for (self.players) |player| {
+        for (self.players) |*player| {
             player.deinit(alloc);
         }
         alloc.free(self.players);
+    }
+
+    pub fn reroll(self: *State) void {
+        for (self.reroll_buffer) |dice_to_reroll, idx| {
+            if (dice_to_reroll) {
+                self.dices[idx] = rng.random.intRangeAtMost(u8, 1, 6);
+            }
+        }
+
+        self.reroll_count = dicesToReroll(&self.dices, &self.reroll_buffer);
     }
 };
 
@@ -121,17 +135,17 @@ const WINNING_CONDITION: usize = 10000;
 fn dicesToReroll(dices: []u8, reroll: *[5]bool) usize {
     var face_counter = [_]u8{0} ** 6;
     // if dices is not 1 or 5 or not contribute to small straight or 3,4,5 of each\
-    for (dices) |dice, index| {
-        face_counter[dice - 1] += 1;
-        if ((dice == 1) or (dice == 5)) {
+    for (dices) |elem, index| {
+        face_counter[elem - 1] += 1;
+        if ((elem == 1) or (elem == 5)) {
             reroll[index] = false;
         }
     }
     for (face_counter) |face_count, face_index| {
         const face = face_index + 1;
         if (face_count >= 3) {
-            for (dices) |dice, idx| {
-                if (dice == face) {
+            for (dices) |elem, idx| {
+                if (elem == face) {
                     reroll[idx] = false;
                 }
             }
@@ -285,15 +299,15 @@ pub fn main() anyerror!void {
 
     switch (options.gui_type) {
         .Cli => {
-            start_cli(options, &state);
+            try startCli(options, &state);
         },
         .Gui => {
-            start_gui(options, &state);
+            try startGui(options, &state);
         },
     }
 }
 
-pub fn start_cli(options: CommandLineOptions, state: *State) !void {
+pub fn startCli(options: CommandLineOptions, state: *State) !void {
     _ = options;
     while (true) {
         // turn starts here
@@ -301,23 +315,36 @@ pub fn start_cli(options: CommandLineOptions, state: *State) !void {
         if (!choice) {
             break;
         }
-        doTurn(&state);
+        doTurn(state);
         state.current_player = (state.current_player + 1) % state.players.len;
     }
 }
 
-pub fn start_gui(options: CommandLineOptions, state: *State) !void {
+pub fn startGui(options: CommandLineOptions, state: *State) !void {
     _ = options;
     _ = state;
 
-    ray.InitWindow();
+    ray.InitWindow(640, 480, "Dice Roller");
     defer ray.CloseWindow();
+    ray.SetTargetFPS(30);
 
-    
+    state.reroll();
+    std.debug.print("DICE := {any}\n", .{ state.dices });
     while (!ray.WindowShouldClose()) {
-        // clear screen with dark green
-        // draw dices
-        // draw button
-        //
+        // handle click:
+        if ( ray.IsMouseButtonPressed(ray.MOUSE_LEFT_BUTTON) ) {
+            for ( state.reroll_buffer ) | *el | {
+                el.* = true;
+            }
+            state.reroll();
+        }
+
+        ray.BeginDrawing();
+        defer ray.EndDrawing();
+
+        ray.ClearBackground(ray.DARKGREEN);
+        for ( state.dices ) | elem, idx | {
+            dice.renderDice(elem, @intCast(i32, idx));
+        }
     }
 }
