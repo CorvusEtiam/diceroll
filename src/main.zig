@@ -19,6 +19,10 @@ pub const State = struct {
     reroll_buffer: [5]bool = [_]bool{true} ** 5,
     reroll_count: usize = 0,
 
+    pub fn nextPlayer(self: *State) void {
+        return;
+    }
+
     pub fn getCurrentPlayer(self: *State) *Player {
         return &self.players[self.current_player];
     }
@@ -150,7 +154,7 @@ pub const State = struct {
     pub fn reroll(self: *State) void {
         for (self.reroll_buffer) |dice_to_reroll, idx| {
             if (dice_to_reroll) {
-                self.dices[idx] = rng.random.intRangeAtMost(u8, 1, 6);
+                self.dices[idx] = global_rng.random.intRangeAtMost(u8, 1, 6);
             }
         }
         const asc_u8 = comptime std.sort.asc(u8);
@@ -172,14 +176,17 @@ const RandState = struct {
     rng: std.rand.DefaultPrng = undefined,
     random: *std.rand.Random = undefined,
 };
-pub var rng: RandState = .{};
+
+pub var global_rng: RandState = .{};
+pub var global_allocator : *std.mem.Allocator = undefined;
+
 
 pub fn initRandomGenerator() void {
     var seed_bytes: [@sizeOf(u64)]u8 = undefined;
     std.crypto.random.bytes(&seed_bytes);
     const seed: u64 = std.mem.readIntNative(u64, &seed_bytes);
-    rng.rng = std.rand.DefaultPrng.init(seed);
-    rng.random = &rng.rng.random;
+    global_rng.rng = std.rand.DefaultPrng.init(seed);
+    global_rng.random = &global_rng.rng.random;
 }
 
 pub fn main() anyerror!void {
@@ -187,6 +194,7 @@ pub fn main() anyerror!void {
     std.debug.print("First things first.\n", .{});
     initRandomGenerator();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    global_allocator = &gpa.allocator;
     var state = try State.init(&gpa.allocator, "User", 2);
     defer state.deinit(&gpa.allocator);
     var options = try args.parseArgs(&gpa.allocator);

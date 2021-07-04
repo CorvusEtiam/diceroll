@@ -1,6 +1,8 @@
 const std = @import("std");
 const ray = @import("../c.zig").ray;
 
+const State = @import("./ui.zig").State;
+
 const DICE_FACES = [6]u8{
     0b0000_1000, // :1
     0b0100_0001, // :2
@@ -24,14 +26,18 @@ const DOT_OFFSET = [7]ray.Vector2 {
 const DICE_SIZE: i32 = 64;
 
 
-pub fn renderDice(dice: u8, position: usize) void {
+pub fn renderDice(dice: u8, position: usize, marked: bool) void {
     var dice_rect = ray.Rectangle { 
         .x = @intToFloat(f32, (position * (DICE_SIZE + 12))) + 24.0,
         .y = 24.0,
         .width = 64.0,
         .height = 64.0 
     };
-    
+    if ( marked ) {
+        const outline = .{ .x = dice_rect.x - 1.0, .y = dice_rect.y - 1.0, .width = dice_rect.width + 1.0, .height = dice_rect.height + 1.0 };
+        ray.DrawRectangleRoundedLines(outline, 0.2, 1, 4, ray.YELLOW);
+    }
+
     ray.DrawRectangleRounded(dice_rect, 0.1, 1, ray.RED);
 
     {
@@ -52,9 +58,8 @@ pub fn renderDice(dice: u8, position: usize) void {
     }
 } 
 
-pub fn renderDices(dices: []u8) void {
-    std.debug.print("Rendering dices: {any}\n", .{ dices });
-    for ( dices ) | dice, index | {
-        renderDice(dice, index);
+pub fn renderDices(state: *const State) void {
+    for ( state.dices ) | dice, index | {
+        renderDice(dice, index, state.reroll_buffer[index]);
     }
 }
