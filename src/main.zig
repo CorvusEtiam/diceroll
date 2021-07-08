@@ -3,29 +3,24 @@ const gui = @import("./gui/ui.zig");
 const cli = @import("./cli/ui.zig");
 const args = @import("./args.zig");
 
+// const layout = @import("./gui/layout.zig");
+// 
+// comptime {
+//     std.testing.refAllDecls(layout);
+// }
+
 pub const Player = struct {
-    is_human: bool = false,
     name: []const u8 = undefined,
     points: u32 = 0,
-    pub fn deinit(self: *Player, alloc: *std.mem.Allocator) void {
-        alloc.free(self.name);
-    }
 };
 
 pub const State = struct {
-    players: []Player = undefined,
-    current_player: usize = 0,
+    player: Player = undefined,
+    alloc: *std.mem.Allocator = undefined,
     dices: [5]u8 = .{0} ** 5,
     reroll_buffer: [5]bool = [_]bool{true} ** 5,
     reroll_count: usize = 0,
-
-    pub fn nextPlayer(self: *State) void {
-        return;
-    }
-
-    pub fn getCurrentPlayer(self: *State) *Player {
-        return &self.players[self.current_player];
-    }
+    
 
     pub fn dicesToReroll(self: *State) usize {
         var face_counter = [_]u8{0} ** 6;
@@ -46,6 +41,15 @@ pub const State = struct {
                 }
             }
         }
+        
+        // var points: usize = 0;
+        // const three_of = patternMatch(self.dices, "NNN??") or patternMatch(self.dices, "?NNN?") or patternMatch(dices, "??NNN"); // { value: u8, count: u8 }
+        // const four_of = patternMatch(self.dices, "NNNN?") or patternMatch(self.dices, "?NNNN");
+        // const five_of = patternMatch(self.dices, "NNNNN");
+        // const many = dices[2];
+        // if ( five_of ) { points = many * 100 * 4; } else if (four_of) { points = many * 100 * 2; } else if ( three_of ) { points = many * 100; }
+        // const has_straight = patternMatch(dices, "12345") or patternMatch(dices, "23456");
+        
         var has_straight: bool = true;
         for (face_counter[0..4]) |face| {
             if (face != 1) {
@@ -66,34 +70,10 @@ pub const State = struct {
         return count;
     }
 
-    pub fn init(alloc: *std.mem.Allocator, user: []const u8, player_count: usize) !State {
-        var arr = std.ArrayList(Player).init(alloc);
-        try arr.append(.{ .name = try alloc.dupe(u8, user), .points = 0, .is_human = true });
-
-        {
-            var idx: usize = 1;
-            while (idx < player_count) : ({
-                idx += 1;
-            }) {
-                try arr.append(Player{
-                    .name = try std.fmt.allocPrint(alloc, "Player {d}", .{idx}),
-                    .points = 0,
-                    .is_human = false,
-                });
-            }
-        }
-
-        return State{
-            .players = arr.toOwnedSlice(),
-            .current_player = 0,
+    pub fn init(user: []const u8) State {
+        return .{
+            .player = .{ .name = user, .points = 0 },
         };
-    }
-
-    pub fn deinit(self: *State, alloc: *std.mem.Allocator) void {
-        for (self.players) |*player| {
-            player.deinit(alloc);
-        }
-        alloc.free(self.players);
     }
 
     pub fn computePoints(self: *State) u32 {
@@ -166,6 +146,14 @@ pub const State = struct {
         std.mem.set(bool, &self.reroll_buffer, true);
         self.reroll();
     }
+
+    pub fn newGame(self: *State, player_name: []const u8) void {
+        self.player = Player {
+            .name = player_name,
+        };
+        std.mem.set(bool, &self.reroll_buffer, true);
+        std.mem.set(u8, &self.dices, 1);
+    }
 };
 
 pub const AppError = error{BadInput};
@@ -195,8 +183,7 @@ pub fn main() anyerror!void {
     initRandomGenerator();
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     global_allocator = &gpa.allocator;
-    var state = try State.init(&gpa.allocator, "User", 2);
-    defer state.deinit(&gpa.allocator);
+    var state = State.init("User");
     var options = try args.parseArgs(&gpa.allocator);
     defer options.deinit(&gpa.allocator);
 

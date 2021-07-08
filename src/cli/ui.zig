@@ -29,11 +29,8 @@ fn doComputerTurn(state: *State) void {
 // When computer
 
 pub fn doTurn(state: *State) void {
-    const current = state.getCurrentPlayer();
-    if (!current.is_human) {
-        return doComputerTurn(state);
-    }
-
+    var current = state.player;
+    
     state.forceReroll();
     std.debug.print("You rolled: {any}\n", .{state.dices});
     var points = state.computePoints();
@@ -67,6 +64,5 @@ pub fn start(options: CommandLineOptions, state: *State) !void {
             break;
         }
         doTurn(state);
-        state.current_player = (state.current_player + 1) % state.players.len;
     }
 }

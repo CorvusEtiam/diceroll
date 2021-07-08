@@ -4,6 +4,7 @@ pub const CommandLineOptions = struct {
     pub const GuiType = enum { Cli, Gui };
     custom_asset_path: ?[]u8 = null,
     gui_type: GuiType = .Gui,
+    custom_font: []const u8 = "arial.ttf",
 
     pub fn deinit(self: *CommandLineOptions, alloc: *std.mem.Allocator) void {
         if (self.custom_asset_path) |asset| {
@@ -30,10 +31,14 @@ pub fn parseArgs(alloc: *std.mem.Allocator) !CommandLineOptions {
             if (index < args.len) {
                 cmd.custom_asset_path = try alloc.dupe(u8, args[index + 1]);
             }
+        } else if ( std.mem.eql(u8, argument, "--font") ) {
+            if (index < args.len) {
+                cmd.custom_font = try alloc.dupe(u8, args[index + 1]);
+            }
         }
     }
 
-    std.debug.print("Command Line Arguments: gui-kind={any}, custom-asset-path={s}\n", .{ cmd.gui_type, cmd.custom_asset_path });
+    std.debug.print("Command Line Arguments: kind={any}, assets={s}, font={s}\n", .{ cmd.gui_type, cmd.custom_asset_path, cmd.custom_font });
 
     return cmd;
 }
