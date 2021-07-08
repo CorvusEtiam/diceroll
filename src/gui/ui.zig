@@ -7,99 +7,141 @@ const dice = @import("./dice.zig");
 const CommandLineOptions = @import("../args.zig").CommandLineOptions;
 pub const State = main.State;
 
-
-pub const ButtonInfo = struct {
-    isEnabled: bool = true,
+pub const GameScreenId = enum {
+    MainMenu,
+    Game,
+    WinScreen,
 };
 
-pub const WidgetInfo = union(enum) {
-    buttonInfo: ButtonInfo, 
-};
+var global_font: ray.Font = undefined;
 
-pub const UiState = struct {
-    alloc: *std.mem.Allocator = undefined,
-    widgets_info: std.StringHashMap(WidgetInfo) = undefined,
-    font: ray.Font = undefined,
+pub const Button = struct {
+    const ButtonState = enum {
+        idle,
+        hovered,
+        pressed,
+    };
 
-    pub fn initFont() ray.Font {
-        return ray.LoadFontEx("resources/arial.ttf", 24, 0, 250);
-    }
+    label: []const u8 = undefined,
+    rect: ray.Rectangle,
+    active: bool = true,
+    state: ButtonState = .idle,
 
-    pub fn init(alloc: *std.mem.Allocator) UiState {
-        return .{
-            .font = UiState.initFont(),
-            .alloc = alloc,
-            .widgets_info = std.StringHashMap(WidgetInfo).init(alloc)
-        };
-    }
-};
+    pub fn handle(self: *Button) bool {
+        if (!self.active) {
+            return false;
+        }
 
-pub var ui_state: UiState = .{};
+        const mouse = ray.GetMousePosition();
+        if (ray.CheckCollisionPointRec(mouse, self.rect)) {
+            if (ray.IsMouseButtonDown(ray.MOUSE_LEFT_BUTTON)) {
+                self.state = .pressed;
+            } else {
+                self.state = .hovered;
+            }
 
-pub fn renderLabel(label: []const u8, position: ray.Vector2, uid: []const u8, color: ray.Color) void {
-    _ = uid;
-    ray.DrawTextEx(ui_state.font, label.ptr, position, 24.0, 1, color);
-}
-
-pub fn renderButton(label: []const u8, button_rect: ray.Rectangle, uid: [] const u8) bool {
-    const mouse = ray.GetMousePosition();
-    var state_found = ui_state.widgets_info.getOrPut(uid) catch unreachable;
-    if ( !state_found.found_existing ) {
-        state_found.value_ptr.buttonInfo = .{ .isEnabled = true };
-    }
-    var button_state: *WidgetInfo = state_found.value_ptr;
-
-    
-    const mouse_over_button = ray.CheckCollisionPointRec(mouse, button_rect);
-
-    var result = ray.IsMouseButtonPressed(ray.MOUSE_LEFT_BUTTON) and mouse_over_button;
-    
-    const text_vec = ray.Vector2 { .x = button_rect.x + 8.0, .y = button_rect.y + 8.0 };
-    
-    if ( !button_state.buttonInfo.isEnabled ) {
-        ray.DrawRectangleRounded(button_rect, 0.1, 1, ray.DARKGRAY);
-    } else {
-        if ( mouse_over_button ) {
-            ray.DrawRectangleRounded(button_rect, 0.1, 1, ray.BLUE);
+            if (ray.IsMouseButtonReleased(ray.MOUSE_LEFT_BUTTON)) {
+                self.state = .idle;
+                return true;
+            } else {
+                return false;
+            }
         } else {
-            ray.DrawRectangleRounded(button_rect, 0.1, 1, ray.DARKBLUE);
+            self.state = .idle;
+            return false;
         }
     }
-    ray.DrawTextEx(ui_state.font, label.ptr, text_vec, 24.0, 2.0, ray.WHITE);
 
-    return button_state.buttonInfo.isEnabled and result;
+    pub fn draw(self: *Button) void {
+        var color: ray.Color = blk: {
+            if (!self.active) break :blk ray.GRAY;
+            switch (self.state) {
+                .pressed => break :blk ray.YELLOW,
+                .hovered => break :blk ray.ORANGE,
+                .idle => break :blk ray.RED,
+            }
+        };
+
+        ray.DrawRectangleRounded(self.rect, 0.2, 1, color);
+        ray.DrawTextEx(global_font, self.label.ptr, .{ .x = self.rect.x + 8.0, .y = self.rect.y + 8.0 }, 24.0, 1.0, ray.BLACK);
+    }
+};
+
+var start_game_button: Button = Button{
+    .label = "Start Game",
+    .rect = .{ .x = 200.0, .y = 200, .width = 200.0, .height = 80.0 },
+};
+var reroll_button: Button = Button{
+    .label = "Reroll",
+    .rect = .{ .x = 100.0, .y = 200, .width = 150.0, .height = 80.0 },
+};
+var end_game: Button = Button{
+    .label = "End Game",
+    .rect = .{ .x = 400.0, .y = 200, .width = 150.0, .height = 80.0 },
+};
+
+pub fn mainMenu(state: *State) GameScreenId {
+    var result: GameScreenId = .MainMenu;
+    if (start_game_button.handle()) {
+        state.forceReroll();
+        result = .Game;
+    }
+
+    ray.BeginDrawing();
+    ray.ClearBackground(ray.BLACK);
+    start_game_button.draw();
+    ray.EndDrawing();
+
+    return result;
 }
 
+fn gameScreen(state: *State) GameScreenId {
+    var result: GameScreenId = .Game;
+    if (reroll_button.handle()) {
+        state.reroll();
+    }
+    if (end_game.handle()) {
+        result = .WinScreen;
+    }
 
+    ray.BeginDrawing();
+    ray.ClearBackground(ray.DARKGREEN);
+    reroll_button.draw();
+    end_game.draw();
+    dice.renderDices(state);
+    ray.EndDrawing();
+    return result;
+}
 
 pub fn start(options: CommandLineOptions, state: *State) !void {
     _ = options;
     ray.InitWindow(640, 480, "Dice Roller");
     defer ray.CloseWindow();
-    ui_state = UiState.init(main.global_allocator);
     ray.SetTargetFPS(60);
-    state.forceReroll();
-    try ui_state.widgets_info.put("new_turn_btn_0", WidgetInfo { .buttonInfo = .{ .isEnabled = false } });
+
+    global_font = ray.LoadFontEx("resources/arial.ttf", 24, 0, 256);
+    defer ray.UnloadFont(global_font);
+
+    var game_screen_id: GameScreenId = .MainMenu;
+    var first_turn: bool = true;
 
     while (!ray.WindowShouldClose()) {
-        if ( renderButton("Reroll", .{ .x = 300.0, .y = 200.0, .width = 120.0, .height = 60.0 }, "reroll_btn_0")) {
-            state.reroll(); 
+        switch (game_screen_id) {
+            .MainMenu => {
+                state.newGame(state.player.name);
+                game_screen_id = mainMenu(state);
+                first_turn = true;
+            },
+            .Game => {
+                if (first_turn) {
+                    state.forceReroll();
+                    first_turn = false;
+                } 
+                game_screen_id = gameScreen(state);
+            },
+            .WinScreen => {
+                game_screen_id = mainMenu(state);
+            },
         }
-        if ( renderButton("Next Turn", .{ .x = 450.0, .y = 200.0, .width = 150.0, .height = 60.0 }, "new_turn_btn_0")) {
-            // switch player
-            state.nextPlayer();
-            state.forceReroll(); 
-        }
-
-        ray.BeginDrawing();
-        defer ray.EndDrawing();
-
-        ray.ClearBackground(ray.DARKGREEN);
-        if ( state.getCurrentPlayer().is_human ) {
-            renderLabel("Turn: Player", .{ .x = 50.0, .y = 230.0 }, "player_lbl", ray.YELLOW);
-        } else {
-            renderLabel("Turn: Computer", .{ .x = 50.0, .y = 230.0 }, "computer_lbl", ray.WHITE);
-        }
-        dice.renderDices(state);
     }
 }
