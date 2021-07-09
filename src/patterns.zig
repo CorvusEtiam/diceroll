@@ -10,14 +10,12 @@ pub const std = @import("std");
 // `N` - any digit
 // `NN` -
 pub fn patternMatch(data: []u8, pattern: []const u8) bool {
-    std.debug.assert(data.len == pattern.len);
-    std.sort.sort(u8, data, {}, std.sort.asc(u8));
     var index: usize = 0;
     var last_matched: u8 = 0;
     var last_matched_used: bool = false;
     while (index < data.len) {
         switch (pattern[index]) {
-            '1' | '2' | '3' | '4' | '5' | '6' => {
+            '1','2','3','4','5','6' => {
                 if (data[index] != pattern[index] - '0') {
                     return false;
                 }
@@ -32,9 +30,8 @@ pub fn patternMatch(data: []u8, pattern: []const u8) bool {
                     }
                 }
             },
-            '?' => {
-                continue;
-            },
+            '?' => {},
+            else => unreachable,
         }
 
         index += 1;
@@ -44,13 +41,19 @@ pub fn patternMatch(data: []u8, pattern: []const u8) bool {
 }
 
 test "Pattern matching" {
-    const arr = [_]u8{ 1, 1, 1, 5, 6 };
+    var arr = [_]u8{ 1, 1, 1, 1, 6 };
     // same 5
-    std.testing.expectEqual(patternMatch(arr, "NNNNN"), false);
-    // same 4
-    std.testing.expectEqual(patternMatch(arr, "NNNN?"), false);
+    try std.testing.expectEqual(patternMatch(&arr, "NNNNN"), false);
+    // same 4`
+    try std.testing.expectEqual(patternMatch(&arr, "NNNN?"), true);
     // same 3
-    std.testing.expectEqual(patternMatch(arr, "NNN??"), true);
+    try std.testing.expectEqual(patternMatch(&arr, "?NNN?"), true);
     // straight
-    std.testing.expectEqual(patternMatch(arr, "12345") or patternMatch(arr, "23456"), true);
+    try std.testing.expectEqual(patternMatch(&arr, "12345") or patternMatch(&arr, "23456"), false);
+}
+
+test "Match straight" {
+    var arr = [_]u8 { 1,2,3,4,5 };
+
+    try std.testing.expectEqual(patternMatch(&arr, "12345") or patternMatch(&arr, "23456"), true);
 }

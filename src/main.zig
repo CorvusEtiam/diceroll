@@ -3,6 +3,8 @@ const gui = @import("./gui/ui.zig");
 const cli = @import("./cli/ui.zig");
 const args = @import("./args.zig");
 
+const patternMatch = @import("./patterns.zig").patternMatch;
+
 // const layout = @import("./gui/layout.zig");
 // 
 // comptime {
@@ -77,57 +79,32 @@ pub const State = struct {
     }
 
     pub fn computePoints(self: *State) u32 {
-        var faces_counter: [6]u8 = .{0} ** 6;
         var points: u32 = 0;
-        for (self.dices) |dice_val| {
-            faces_counter[dice_val - 1] += 1;
-        }
-        switch (faces_counter[0]) {
-            0, 1, 2 => {
-                points += faces_counter[0] * 100;
-            },
-            3 => {
-                points += 1000;
-            },
-            4 => {
-                points += 2000;
-            },
-            5 => {
-                points += 4000;
-            },
-            else => @panic("Faces count cannot be bigger than 5"),
-        }
-        points += faces_counter[4] * 50;
+        const three_of = patternMatch(&self.dices, "NNN??") or patternMatch(&self.dices, "?NNN?") or patternMatch(&self.dices, "??NNN");
+        const four_of = patternMatch(&self.dices, "NNNN?") or patternMatch(&self.dices, "?NNNN");
+        const five_of = patternMatch(&self.dices, "NNNNN");
+        const ones = @intCast(u32, std.mem.count(u8, &self.dices, &.{1}));
+        const fives = @intCast(u32, std.mem.count(u8, &self.dices, &.{5}));
+        
+        const multiple_factor: u32 = if (self.dices[3] == 1) 1000 else 100;
 
-        for (faces_counter[1..5]) |face_count, index| {
-            const face: u32 = @intCast(u32, index) + 2;
-            switch (face_count) {
-                0, 1, 2 => {},
-                3 => {
-                    points += face * 100;
-                },
-                4 => {
-                    points += 2 * face * 100;
-                },
-                5 => {
-                    points += 4 * face * 100;
-                },
-                else => @panic("Face count cannot be bigger than 5!"),
-            }
+        if ( five_of ) {
+            points += self.dices[3] * multiple_factor * 4;
+        } else if ( four_of ) {
+            points += self.dices[3] * multiple_factor * 2;
+        } else if ( three_of ) {
+            points += self.dices[3] * multiple_factor;
         }
-
-        // check straight
-        var has_low_straight: bool = true;
-        for (faces_counter[0..4]) |face| {
-            if (face != 1) {
-                has_low_straight = false;
-                break;
-            }
+        
+        if ( ones < 3 ) {
+            points += ones * 100;
         }
-        if (has_low_straight) {
+        if ( fives < 3 ) {
+            points += fives * 50;
+        }
+        if ( patternMatch(&self.dices, "12345") or patternMatch(&self.dices, "23456")) {
             points += 1250;
         }
-
         return points;
     }
 
@@ -176,6 +153,7 @@ pub fn initRandomGenerator() void {
     global_rng.rng = std.rand.DefaultPrng.init(seed);
     global_rng.random = &global_rng.rng.random;
 }
+
 
 pub fn main() anyerror!void {
     std.debug.print("== Hello in this little dice roller == \n", .{});
